@@ -1,0 +1,1 @@
+VALID_STAGES = ["demo", "pricing", "objection", "negotiation"]
