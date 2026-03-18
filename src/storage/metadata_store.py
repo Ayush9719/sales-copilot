@@ -97,3 +97,17 @@ class MetadataStore:
         query = "SELECT DISTINCT call_id FROM chunks"
         rows = self.conn.execute(query).fetchall()
         return [r[0] for r in rows]
+    
+    def get_chunks_by_sequence(
+        self,
+        call_id: str,
+        sequence_ids: list
+    ):
+        query = f"""
+        SELECT * FROM chunks
+        WHERE call_id = ?
+        AND sequence_id IN ({','.join(['?'] * len(sequence_ids))})
+        ORDER BY sequence_id
+        """
+        params = [call_id] + sequence_ids
+        return self.conn.execute(query, params).fetchall()

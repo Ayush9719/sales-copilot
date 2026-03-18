@@ -8,12 +8,17 @@ class AnswerGenerator:
     def generate(self, query: str, chunks: list):
         prompt = build_prompt(query, chunks)
         response = self.llm.generate(prompt)
-        return response
-    
-    def format_sources(chunks):
-        sources = []
-        for idx, c in enumerate(chunks):
-            sources.append(
-                f"[{idx}] {c[1]} | {c[4]} | {c[3]}: {c[2][:100]}"
-            )
-        return "\n".join(sources)
+        used_indices = self._extract_used_indices(response)
+        if not used_indices:
+            used_indices = list(range(min(3, len(chunks))))
+        return response, used_indices
+
+    def _extract_used_indices(self, response: str):
+        import re
+        match = re.search(r"\[(.*?)\]", response)
+        if not match:
+            return []
+        try:
+            return [int(x.strip()) for x in match.group(1).split(",")]
+        except:
+            return []

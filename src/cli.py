@@ -2,7 +2,8 @@ import typer
 from rich import print
 from src.ingestion.pipeline import ingest
 from src.ingestion.store_pipeline import store_chunks
-from src.main import ask
+from src.main import ask, summarize_call
+from src.retrieval.query_intent import detect_intent
 from src.storage.metadata_store import MetadataStore
 
 app = typer.Typer()
@@ -19,19 +20,24 @@ def ingest_call(file_path: str):
 
 @app.command()
 def query(q: str):
-    """
-    Ask a question about calls
-    """
-    ask(q)
+    intent = detect_intent(q)
 
-@app.command()
-def list_calls():
-    store = MetadataStore()
-    calls = store.list_calls()
+    if intent == "list_calls":
+        store = MetadataStore()
+        calls = store.list_calls()
 
-    print("[bold]Available Calls:[/bold]")
-    for c in calls:
-        print(f"- {c}")
+        print("\nAvailable Calls:\n")
+        for c in calls:
+            print(f"- {c}")
+
+    elif intent == "summarize":
+        summarize_call(q)
+
+    elif intent == "negative_feedback":
+        ask(q + " Focus on negative feedback and objections.")
+
+    else:
+        ask(q)
 
 if __name__ == "__main__":
     app()

@@ -33,11 +33,29 @@ class Retriever:
 
         return results
 
-    def smart_retrieve(self, query: str, top_k=5):
+    def stitch_context(self, rows):
+        stitched = []
+        seen = set()
+        for row in rows:
+            call_id = row[1]
+            seq_id = row[7]
+            neighbor_ids = [seq_id - 1, seq_id, seq_id + 1]
+            neighbors = self.metadata_store.get_chunks_by_sequence(call_id, neighbor_ids)
+            for n in neighbors:
+                key = (n[1], n[7])  # call_id + sequence_id
+                if key not in seen:
+                    seen.add(key)
+                    stitched.append(n)
+        stitched.sort(key=lambda x: (x[1], x[7]))
+        return stitched
+
+    def smart_retrieve(self, query: str, top_k=8):
         filters = parse_query(query)
-        return self.retrieve(
+        rows = self.retrieve(
             query=query,
             top_k=top_k,
             stage=filters["stage"],
             tags=filters["tags"],
         )
+        stitched = self.stitch_context(rows)
+        return stitched[:6]

@@ -11,20 +11,29 @@ Text: {chunk[2]}
 """
 
     prompt = f"""
-You are a sales assistant AI.
-Answer the user query using ONLY the provided context.
-If the answer is not present, say "I don't know".
-Provide:
-1. A clear answer
-2. Bullet points if needed
-3. Cite sources using [index] references
+You are analyzing sales call transcripts.
+
+Answer the question using ONLY the provided context.
+
+Guidelines:
+- Combine information across snippets
+- Be concise and factual
+- Do not assume information not present
+- If information is partial, answer with available evidence
+- If the query asks for negative feedback, focus on complaints, objections, or concerns.
+
 ---
-Query:
+
+Question:
 {query}
+
 ---
+
 Context:
 {context}
+
 ---
+
 Answer:
 """
     return prompt
