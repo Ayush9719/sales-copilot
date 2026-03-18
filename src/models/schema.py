@@ -1,0 +1,11 @@
+from pydantic import BaseModel
+from typing import List
+
+class Chunk(BaseModel):
+    chunk_id: str
+    call_id: str
+    text: str
+    speaker: str
+    timestamp: str
+    stage: str
+    tags: List[str]
