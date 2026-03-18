@@ -92,3 +92,8 @@ class MetadataStore:
             results.append(row)
 
         return results
+    
+    def list_calls(self):
+        query = "SELECT DISTINCT call_id FROM chunks"
+        rows = self.conn.execute(query).fetchall()
+        return [r[0] for r in rows]
