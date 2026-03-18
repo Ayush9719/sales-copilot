@@ -57,3 +57,38 @@ class MetadataStore:
         """
         rows = self.conn.execute(query, chunk_ids).fetchall()
         return rows
+    
+    def filter_chunks(
+        self,
+        chunk_ids=None,
+        stage=None,
+        tags=None,
+        speaker=None,
+    ):
+        query = "SELECT * FROM chunks WHERE 1=1"
+        params = []
+
+        if chunk_ids:
+            query += f" AND chunk_id IN ({','.join(['?']*len(chunk_ids))})"
+            params.extend(chunk_ids)
+
+        if stage:
+            query += " AND stage = ?"
+            params.append(stage)
+
+        if speaker:
+            query += " AND speaker LIKE ?"
+            params.append(f"%{speaker}%")
+
+        rows = self.conn.execute(query, params).fetchall()
+
+        # tag filtering (post-process since stored as JSON)
+        results = []
+        for row in rows:
+            row_tags = json.loads(row[6])
+            if tags:
+                if not any(tag in row_tags for tag in tags):
+                    continue
+            results.append(row)
+
+        return results
