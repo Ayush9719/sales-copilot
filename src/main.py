@@ -8,25 +8,27 @@ def ask(query: str):
     generator = AnswerGenerator()
 
     # 1. retrieval
-    retrieved_chunks = retriever.smart_retrieve(query, top_k=10)
+    retrieved_chunks = retriever.smart_retrieve(query, top_k=15)
+    # print("\n=== RETRIEVED CHUNKS ===\n")
+    # for i, c in enumerate(retrieved_chunks):
+    #     print(f"[{i}] {c[1]} | {c[4]} | {c[3]}")
+    #     print(c[2][:150])
+    #     print("-" * 50)
 
-    # 2. reranking (self-healing)
+    # 2. reranking
     reranked_chunks = reranker.rerank(query, retrieved_chunks)
+    # print("\n=== RERANKER OUTPUT ===\n")
+    # for i, c in enumerate(reranked_chunks):
+    #     print(f"[{i}] {c[2][:120]}")
 
-    # 3. generation (self-healing)
-    answer, used_indices = generator.generate(query, reranked_chunks)
-
-    final_sources = [
-        reranked_chunks[i]
-        for i in used_indices
-        if i < len(reranked_chunks)
-    ]
+    # 3. generation
+    answer, _ = generator.generate(query, reranked_chunks)
 
     print("\n=== ANSWER ===\n")
     print(answer.strip())
 
     print("\n=== SOURCES ===\n")
-    for idx, c in enumerate(final_sources):
+    for idx, c in enumerate(reranked_chunks):
         print(f"[{idx}] {c[1]} | {c[4]} | {c[3]}: {c[2][:120]}")
 
 def summarize_call(query: str):

@@ -58,4 +58,4 @@ class Retriever:
             tags=filters["tags"],
         )
         stitched = self.stitch_context(rows)
-        return stitched[:6]
+        return stitched
