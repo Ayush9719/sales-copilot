@@ -11,16 +11,17 @@ def chunk_transcript(
     chunks = []
 
     for idx, entry in enumerate(parsed_data):
-        text = f"{entry['speaker']}: {entry['text']}"
+        speaker = entry["speaker"].strip()
+        text = entry["text"].strip()
         chunk = Chunk(
-            chunk_id    = str(uuid.uuid4()),
-            call_id     = call_id,
-            text        = text,
-            speaker     = entry["speaker"],
-            timestamp   = entry["timestamp"],
-            sequence_id = idx,
-            stage       = stage,
-            tags        = extract_tags(text),
+            chunk_id        = str(uuid.uuid4()),
+            call_id         = call_id,
+            text            = text,
+            speaker         = speaker,
+            timestamp       = entry["timestamp"],
+            sequence_id     = idx,
+            stage           = stage,
+            tags            = extract_tags(f"{speaker}: {text}"),
         )
         chunks.append(chunk)
     return chunks

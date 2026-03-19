@@ -94,7 +94,12 @@ class MetadataStore:
         return results
     
     def list_calls(self):
-        query = "SELECT DISTINCT call_id FROM chunks"
+        query = """
+        SELECT call_id
+        FROM chunks
+        GROUP BY call_id
+        ORDER BY MAX(rowid) DESC
+        """
         rows = self.conn.execute(query).fetchall()
         return [r[0] for r in rows]
     
@@ -111,3 +116,23 @@ class MetadataStore:
         """
         params = [call_id] + sequence_ids
         return self.conn.execute(query, params).fetchall()
+    
+    def get_last_call_id(self):
+        query = """
+        SELECT call_id
+        FROM chunks
+        GROUP BY call_id
+        ORDER BY MAX(rowid) DESC
+        LIMIT 1
+        """
+        row = self.conn.execute(query).fetchone()
+        return row[0] if row else None
+
+
+    def get_chunks_by_call_id(self, call_id: str):
+        query = """
+        SELECT * FROM chunks
+        WHERE call_id = ?
+        ORDER BY sequence_id
+        """
+        return self.conn.execute(query, (call_id,)).fetchall()

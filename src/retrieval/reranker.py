@@ -1,3 +1,6 @@
+import json
+import re
+from typing import List
 from src.llm.ollama_provider import OllamaLLM
 
 
@@ -5,72 +8,116 @@ class LLMReranker:
     def __init__(self):
         self.llm = OllamaLLM()
 
-    def rerank(self, query: str, chunks: list, min_k: int = 2, max_k: int = 10):
+    def rerank(self, query: str, chunks: list, min_k: int = 2, max_k: int = 5) -> list:
+        """
+        Returns a reranked subset of the input chunks.
+
+        Expects the model to return JSON like:
+        {
+          "selected_indices": [1, 0, 3]
+        }
+        """
         if not chunks:
             return []
-        filtered_chunks = [
-            c for c in chunks if not self._is_low_signal(c[2])
-        ]
-        if not filtered_chunks:
-            filtered_chunks = chunks
-        context = ""
-        for idx, c in enumerate(filtered_chunks):
-            context += f"\n[{idx}] {c[2]}\n"
+
+        capped_chunks = chunks[: min(len(chunks), 12)]
+
+        context_parts = []
+        for idx, c in enumerate(capped_chunks):
+            context_parts.append(
+                f"""[{idx}]
+Call ID: {c[1]}
+Timestamp: {c[4]}
+Speaker: {c[3]}
+Text: {c[2]}
+"""
+            )
+        context = "\n".join(context_parts)
+
         prompt = f"""
-You are helping answer a user question from call transcripts.
+You are a sales call retrieval reranker.
 
-Reorder the snippets that according to the usefulness for answering the question.
+Your job is to select the most useful transcript snippets for answering the user's question.
 
-Guidelines:
-- Prioritize snippets that directly address the question topic, even if wording differs (e.g., pricing may include discounts, cost, or financial terms).
-- Prefer specific, actionable statements over general discussion
-- Ignore introductions, recaps, or generic conversation
-- Avoid redundant snippets
-- Include supporting context only if it helps answer the question
-- Return {min_k}-{max_k} indices
+Instructions:
+- Prefer snippets that directly answer the question.
+- Keep supporting context only if it helps the final answer.
+- Avoid redundant snippets.
+- Return between {min_k} and {max_k} snippet indices.
+- Return ONLY valid JSON.
+- Do not include any explanation.
 
----
+Return exactly:
+{{
+  "selected_indices": [0, 2, 4]
+}}
 
 Question:
 {query}
 
----
-
-Context:
+Candidate snippets:
 {context}
+""".strip()
 
----
+        response = self.llm.generate(prompt)
+        parsed = self._safe_parse_response(response)
 
-Output:
-comma-separated indices (e.g., 1,3)
-"""
+        indices = self._normalize_indices(
+            parsed.get("selected_indices", []),
+            total_chunks=len(capped_chunks),
+        )
 
-        response = self.llm.generate(prompt).strip()
-        try:
-            indices = [int(x.strip()) for x in response.split(",")]
-        except:
-            indices = []
+        selected = [capped_chunks[i] for i in indices]
 
-        selected = [
-            filtered_chunks[i]
-            for i in indices
-            if 0 <= i < len(filtered_chunks)
-        ]
         if len(selected) < min_k:
-            selected = filtered_chunks[:max(min_k, min(len(filtered_chunks), max_k))]
+            selected = capped_chunks[: max(min_k, min(len(capped_chunks), max_k))]
 
         return selected[:max_k]
 
-    def _is_low_signal(self, text: str) -> bool:
-        text = text.lower()
+    def _safe_parse_response(self, response: str) -> dict:
+        text = response.strip()
 
-        noise_patterns = [
-            "good morning",
-            "quick recap",
-            "last week",
-            "agenda",
-            "thanks for joining",
-            "let's get started",
-        ]
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
 
-        return any(p in text for p in noise_patterns)
+        fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if fenced_match:
+            candidate = fenced_match.group(1)
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+
+        json_match = re.search(r"\{.*\}", text, re.DOTALL)
+        if json_match:
+            candidate = json_match.group(0)
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+
+        return {}
+
+    def _normalize_indices(self, indices, total_chunks: int) -> List[int]:
+        if not isinstance(indices, list):
+            return []
+
+        cleaned = []
+        for item in indices:
+            try:
+                idx = int(item)
+            except Exception:
+                continue
+
+            if 0 <= idx < total_chunks and idx not in cleaned:
+                cleaned.append(idx)
+
+        return cleaned
